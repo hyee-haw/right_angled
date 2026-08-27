@@ -1,0 +1,18 @@
+[project]
+name = "right_angled"
+version = "0.9.0"
+description = "Blender add-on for creating right-angled connections between nodes"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fake-bpy-module>=20260826",
+]
+[tool.ruff]
+line-length = 79  # Maximum line length for code (PEP 8 standard) 
+
+[tool.ruff.lint]
+select = ["E501", "W505"]  # Enable line length and docstring/comment length checks 
+ignore = ["UP032"]  # UP032: Use f-string instead of format call
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 72  # Maximum line length for comments and docstrings
