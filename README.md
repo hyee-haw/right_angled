@@ -57,8 +57,8 @@ while nodes with the same y-coordinate are aligned horizontally.
 
 ## Limitations
 
-At present, it is difficult to retrieve the position of a node socket
-using the Blender Python API.
+At present, the Blender Python API does not provide a way to retrieve the
+location of a node socket.
 For this reason, the add-on uses a nonstandard approach to obtain it.
 
 The values obtained this way appear to be rounded at some stage.
@@ -69,7 +69,7 @@ and moving nodes may introduce additional misalignment.
 
 [Blender Extensions](https://extensions.blender.org/) -
 [Node Align (节点对齐)](https://extensions.blender.org/add-ons/node-align/)
-: How to get the location of a node's sockets.
+: How to get the location of a node sockets.
 
 ## Author
 
