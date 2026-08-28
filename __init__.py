@@ -203,7 +203,10 @@ def is_node_not_to_touch(
 class RightAngledPreferences(bpy.types.AddonPreferences):
     """Preferences for Right-Angled Node Connection."""
 
-    bl_idname = __name__
+    if __package__ is None:
+        bl_idname = "__main__"
+    else:
+        bl_idname = __package__
 
     space: bpy.props.FloatProperty(
         name="Space Length",
@@ -292,7 +295,7 @@ class BaseOperator(bpy.types.Operator):
 
     def get_preferences(self, context) -> RightAngledPreferences:
         """Returns the preferences for this Addon."""
-        return bpy.context.preferences.addons[__name__].preferences
+        return bpy.context.preferences.addons[__package__].preferences
 
 
 # noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
@@ -984,7 +987,7 @@ class NODE_PT_rightangled_sidebar(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         """Poll method to check if the panel can be displayed."""
-        addon = context.preferences.addons[__name__]
+        addon = context.preferences.addons[__package__]
         if addon is None:
             return False
 
@@ -1001,7 +1004,7 @@ class NODE_PT_rightangled_sidebar(bpy.types.Panel):
 
         is_refreshed = True  # Set "refreshed" flag
 
-        addon = context.preferences.addons[__name__]
+        addon = context.preferences.addons[__package__]
         if addon is None:
             return
         preferences = addon.preferences
@@ -1371,7 +1374,3 @@ def unregister():
     if custom_icons is not None:
         bpy.utils.previews.remove(custom_icons)
         custom_icons = None
-
-
-if __name__ == "__main__":
-    register()
