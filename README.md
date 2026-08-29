@@ -12,6 +12,11 @@ It includes the following features:
 - Align Selected Nodes
 - Set Consistent Spacing Between Selected Nodes
 
+This might be useful for people who prefer right-angled wiring connections,
+such as electrical schematic design engineers.
+
+![Sample_Node](images/Sample_Node_1920x1080.png)
+
 ## Requirements
 
 Blender 4.2 LTS or newer.
@@ -55,11 +60,21 @@ while nodes with the same y-coordinate are aligned horizontally.
 
 ![Set Consistent Spacing](images/Set_Consistent_Spacing_1920x1080.png)
 
+### Preferences
+
+Several settings are available under Edit > Preferences... > Add-ons.
+
+- You can configure the shortcut key used to open the pop-up menu,
+  or disable the shortcut entirely.
+- You can hide the Node Editor's side panel.
+
+![Preference_Popup](images/Preference_Popup_1920x1080.png)
+
 ## Limitations
 
 At present, the Blender Python API does not provide a way to retrieve the
 location of a node socket.
-For this reason, the add-on uses a nonstandard approach to obtain it.
+For this reason, the add-on uses a nonstandard, tricky approach to obtain it.
 
 The values obtained this way appear to be rounded at some stage.
 As a result, connection lines do not always align perfectly horizontally,
