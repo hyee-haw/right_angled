@@ -16,10 +16,14 @@
 import ctypes
 import os
 import platform
+from typing import TYPE_CHECKING
 
 import bpy
 import bpy.utils.previews
 import mathutils
+
+if TYPE_CHECKING:
+    import bpy.stub_internal.rna_enums as rna_enums
 
 # Constants
 REFRESH_INTERVAL = 0.10  # Panel Refresh interval in seconds
@@ -30,6 +34,7 @@ addon_keymaps = []
 classes = ()
 
 # For panel refresh
+is_refreshing = False
 is_refreshed = False
 
 # For icons
@@ -203,9 +208,7 @@ def is_node_not_to_touch(
 class RightAngledPreferences(bpy.types.AddonPreferences):
     """Preferences for Right-Angled Node Connection."""
 
-    if __package__ is None:
-        bl_idname = "__main__"
-    else:
+    if __package__ is not None:
         bl_idname = __package__
 
     space: bpy.props.FloatProperty(
@@ -228,7 +231,7 @@ class RightAngledPreferences(bpy.types.AddonPreferences):
         default=True,
     )
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context) -> None:
         layout = self.layout
 
         layout.label(text="Size Settings:")
@@ -282,8 +285,9 @@ class BaseOperator(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}  # noqa: RUF012
 
     @classmethod
-    def poll(cls, context) -> bool:
+    def poll(cls, context: bpy.types.Context) -> bool:
         """Poll method to check if the operator can be executed."""
+
         active_node = getattr(context, "active_node", None)
         if active_node is None:
             return False
@@ -293,8 +297,11 @@ class BaseOperator(bpy.types.Operator):
             or len(getattr(context, "selected_nodes", [])) < 2
         )
 
-    def get_preferences(self, context) -> RightAngledPreferences:
+    def get_preferences(
+        self, context: bpy.types.Context
+    ) -> RightAngledPreferences:
         """Returns the preferences for this Addon."""
+
         return bpy.context.preferences.addons[__package__].preferences
 
 
@@ -310,7 +317,9 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
     bl_idname = "node.rightangled_right_angle_connection"
     bl_label = "Right-Angle Connection"
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
 
         active_node = getattr(context, "active_node", None)
         selected_nodes = getattr(context, "selected_nodes", [])
@@ -435,11 +444,13 @@ class NODE_OT_rightangled_set_node_width(BaseOperator):
     bl_label = "Set Node Width"
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
         """Poll method to check if the operator can be executed."""
         return len(getattr(context, "selected_nodes", [])) > 0
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
         """Set the width of the selected nodes."""
         node_width = self.get_preferences(context).width
 
@@ -464,7 +475,10 @@ class NODE_OT_rightangled_align_left(BaseOperator):
     bl_idname = "node.rightangled_align_left"
     bl_label = "Align Left"
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
+        """Align selected nodes to the left of the active node."""
 
         if context.active_node is None or context.selected_nodes is None:
             return {"CANCELLED"}
@@ -490,7 +504,9 @@ class NODE_OT_rightangled_align_center(BaseOperator):
     bl_idname = "node.rightangled_align_center"
     bl_label = "Align Center"
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
         if context.active_node is None or context.selected_nodes is None:
             return {"CANCELLED"}
 
@@ -520,7 +536,9 @@ class NODE_OT_rightangled_align_right(BaseOperator):
     bl_idname = "node.rightangled_align_right"
     bl_label = "Align Right"
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
         if context.active_node is None or context.selected_nodes is None:
             return {"CANCELLED"}
 
@@ -550,7 +568,9 @@ class NODE_OT_rightangled_align_top(BaseOperator):
     bl_idname = "node.rightangled_align_top"
     bl_label = "Align Top"
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
         if context.active_node is None or context.selected_nodes is None:
             return {"CANCELLED"}
 
@@ -574,7 +594,9 @@ class NODE_OT_rightangled_align_bottom(BaseOperator):
     bl_idname = "node.rightangled_align_bottom"
     bl_label = "Align Bottom"
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
         if context.active_node is None or context.selected_nodes is None:
             return {"CANCELLED"}
 
@@ -600,7 +622,9 @@ class NODE_OT_rightangled_space_horizontal(BaseOperator):
     bl_idname = "node.rightangled_space_horizontal"
     bl_label = "Spaces Horizontally"
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
         if context.active_node is None or context.selected_nodes is None:
             return {"CANCELLED"}
 
@@ -679,7 +703,10 @@ class NODE_OT_rightangled_space_vertical(BaseOperator):
     bl_idname = "node.rightangled_space_vertical"
     bl_label = "Spaces Vertically"
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
+
         if context.active_node is None or context.selected_nodes is None:
             return {"CANCELLED"}
 
@@ -761,14 +788,14 @@ class NODE_OT_rightangled_show_active_info(BaseOperator):
     bl_label = "Active Node Info"
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
         """Poll method to check if the operator can be executed."""
         return not (
             getattr(context, "active_node", None) is None
             or len(getattr(context, "selected_nodes", [])) < 1
         )
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context) -> None:
         layout = self.layout
 
         if layout is None:
@@ -803,7 +830,9 @@ class NODE_OT_rightangled_show_active_info(BaseOperator):
         else:
             layout.label(text="No active node found.", icon="NODE")
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
         # Display the popup with the active node information
         return context.window_manager.invoke_popup(self)
 
@@ -817,18 +846,21 @@ class NODE_OT_rightangled_refresh_timer(BaseOperator):
     bl_label = "Refresh Active Node Info"
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
         """Poll method to check if the operator can be executed."""
         return True
 
-    def execute(self, context):
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
+
         global is_refreshed
 
         is_refreshed = True  # Set "refreshed" flag
 
         props = getattr(context.window_manager, "rightangled_props", None)
         if props is None:
-            return
+            return {"CANCELLED"}
 
         props.is_refreshing = True
 
@@ -856,7 +888,7 @@ class NODE_MT_rightangled_align_menu(bpy.types.Menu):
     bl_label = "Align"
     bl_idname = "NODE_MT_rightangled_align_menu"
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context | None) -> None:
         global custom_icons
         layout = self.layout
 
@@ -907,7 +939,7 @@ class NODE_MT_rightangled_space_menu(bpy.types.Menu):
     bl_label = "Spaces"
     bl_idname = "NODE_MT_rightangled_space_menu"
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context | None) -> None:
         global custom_icons
         layout = self.layout
 
@@ -936,7 +968,7 @@ class NODE_MT_rightangled_main_popup(bpy.types.Menu):
     bl_label = "Right-Angled Node Connection"
     bl_idname = "NODE_MT_rightangled_main_popup"
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context | None) -> None:
         global custom_icons
         layout = self.layout
 
@@ -985,7 +1017,7 @@ class NODE_PT_rightangled_sidebar(bpy.types.Panel):
     bl_category = "Right-Angled"
 
     @classmethod
-    def poll(cls, context):
+    def poll(cls, context: bpy.types.Context) -> bool:
         """Poll method to check if the panel can be displayed."""
         addon = context.preferences.addons[__package__]
         if addon is None:
@@ -994,7 +1026,7 @@ class NODE_PT_rightangled_sidebar(bpy.types.Panel):
         preferences = addon.preferences
         return preferences.enable_sidebar
 
-    def draw(self, context):
+    def draw(self, context: bpy.types.Context) -> None:
         global custom_icons
 
         if custom_icons is None:
@@ -1196,7 +1228,7 @@ list_icon_files = [
 # Handlers for the process_width and process_height properties of a node
 
 
-def get_node_process_width(self):
+def get_node_process_width(self) -> float:
     """Get Handler for the process_width property of a node."""
     if self.bl_idname == "NodeReroute":
         return 0.0
@@ -1204,13 +1236,13 @@ def get_node_process_width(self):
     return self.width
 
 
-def set_node_process_width(self, value):
+def set_node_process_width(self, value: float) -> None:
     """Set Handler for the process_width property of a node."""
     if self.bl_idname != "NodeReroute":
         self.width = value
 
 
-def get_node_process_height(self):
+def get_node_process_height(self) -> float:
     """Get Handler for the process_height property of a node."""
     if self.bl_idname == "NodeReroute":
         return 0.0
@@ -1224,7 +1256,7 @@ def get_node_process_height(self):
 is_refreshed = False  # Indicate if the display has been refreshed
 
 
-def force_redraw_node_editor_timer():
+def force_redraw_node_editor_timer() -> float | None:
     """Force redraw of the Node Editor area."""
     global is_refreshed
 
@@ -1284,7 +1316,7 @@ classes = (
 )
 
 
-def register():
+def register() -> None:
     # Load custom icons
     global custom_icons
     custom_icons = bpy.utils.previews.new()
@@ -1333,7 +1365,7 @@ def register():
     )
 
 
-def unregister():
+def unregister() -> None:
     # Stop the refresh process if it is still running
     global is_refreshed
     is_refreshed = True  # Set "refreshed" flag
