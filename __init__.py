@@ -26,22 +26,30 @@ if TYPE_CHECKING:
     import bpy.stub_internal.rna_enums as rna_enums
 
 # Constants
-REFRESH_INTERVAL = 0.10  # Panel Refresh interval in seconds
-NDIGITS = 1  # Number of decimal digits for float values
+REFRESH_INTERVAL: float = 0.10  # Panel Refresh interval in seconds
+NDIGITS: int = 1  # Number of decimal digits for float values
 
 # Global variables
-addon_keymaps = []
-classes = ()
+addon_keymaps: list[tuple[bpy.types.KeyMap, bpy.types.KeyMapItem]] = []
+classes: tuple[
+    type[
+        bpy.types.Operator
+        | bpy.types.Panel
+        | bpy.types.Menu
+        | bpy.types.AddonPreferences
+    ],
+    ...,
+] = ()
 
 # For panel refresh
-is_refreshing = False
-is_refreshed = False
+is_refreshing: bool = False
+is_refreshed: bool = False
 
 # For icons
-dir_addon = os.path.dirname(__file__)
-dir_icons = os.path.join(dir_addon, "icons")
-list_icon_files = []
-custom_icons = None
+dir_addon: str = ""
+dir_icons: str = ""
+list_icon_files: list[str] = []
+custom_icons: bpy.utils.previews.ImagePreviewCollection | None = None
 
 
 # noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
@@ -208,8 +216,7 @@ def is_node_not_to_touch(
 class RightAngledPreferences(bpy.types.AddonPreferences):
     """Preferences for Right-Angled Node Connection."""
 
-    if __package__ is not None:
-        bl_idname = __package__
+    bl_idname = f"{(__package__ or '')}"
 
     space: bpy.props.FloatProperty(
         name="Space Length",
@@ -855,14 +862,11 @@ class NODE_OT_rightangled_refresh_timer(BaseOperator):
     ) -> set["rna_enums.OperatorReturnItems"]:
 
         global is_refreshed
+        global is_refreshing
 
-        is_refreshed = True  # Set "refreshed" flag
-
-        props = getattr(context.window_manager, "rightangled_props", None)
-        if props is None:
-            return {"CANCELLED"}
-
-        props.is_refreshing = True
+        # Set the timer flags
+        is_refreshed = True
+        is_refreshing = True
 
         if bpy.app.timers.is_registered(force_redraw_node_editor_timer):
             bpy.app.timers.unregister(force_redraw_node_editor_timer)
@@ -1032,22 +1036,19 @@ class NODE_PT_rightangled_sidebar(bpy.types.Panel):
         if custom_icons is None:
             return
 
-        global is_refreshed
-
-        is_refreshed = True  # Set "refreshed" flag
-
         addon = context.preferences.addons[__package__]
         if addon is None:
             return
         preferences = addon.preferences
 
-        props = getattr(context.window_manager, "rightangled_props", None)
-        if props is None:
-            return
-
         # Start the refresh process if it is not already refreshing
-        if not props.is_refreshing:
-            props.is_refreshing = True
+        global is_refreshed
+        global is_refreshing
+
+        is_refreshed = True
+
+        if not is_refreshing:
+            is_refreshing = True
 
             if bpy.app.timers.is_registered(force_redraw_node_editor_timer):
                 bpy.app.timers.unregister(force_redraw_node_editor_timer)
@@ -1058,6 +1059,7 @@ class NODE_PT_rightangled_sidebar(bpy.types.Panel):
                 persistent=True,
             )
 
+        # Panel Layout
         layout = self.layout
         if layout is None:
             return
@@ -1259,14 +1261,10 @@ is_refreshed = False  # Indicate if the display has been refreshed
 def force_redraw_node_editor_timer() -> float | None:
     """Force redraw of the Node Editor area."""
     global is_refreshed
+    global is_refreshing
 
     if not is_refreshed:
-        context = bpy.context
-        props = getattr(context.window_manager, "rightangled_props", None)
-        if props is None:
-            return None  # Stop the timer
-
-        props.is_refreshing = False
+        is_refreshing = False
 
         return None  # Stop the timer
 
@@ -1282,22 +1280,11 @@ def force_redraw_node_editor_timer() -> float | None:
     return REFRESH_INTERVAL
 
 
-class RightAngledGlobalProperties(bpy.types.PropertyGroup):
-    """Property Group for Right-Angled Node Connection."""
-
-    is_refreshing: bpy.props.BoolProperty(
-        name="Is Refreshing Display",
-        description="Indicates if the node information is being refreshed",
-        default=False,
-    )
-
-
 # noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
 # Register and Unregister Functions
 
 classes = (
     RightAngledPreferences,
-    RightAngledGlobalProperties,
     NODE_OT_rightangled_right_angle_connection,
     NODE_OT_rightangled_set_node_width,
     NODE_OT_rightangled_align_left,
@@ -1317,13 +1304,18 @@ classes = (
 
 
 def register() -> None:
-    # Load custom icons
+    # Load custom icons data
+    global dir_addon
+    global dir_icons
     global custom_icons
+    global list_icon_files
+
     custom_icons = bpy.utils.previews.new()
 
-    for icon_name in list_icon_files:
-        icon_path = os.path.join(dir_icons, icon_name + ".svg")
-        custom_icons.load(icon_name, icon_path, "IMAGE")
+    if custom_icons is not None:
+        for icon_name in list_icon_files:
+            icon_path = os.path.join(dir_icons, icon_name + ".svg")
+            custom_icons.load(icon_name, icon_path, "IMAGE")
 
     # Class registration
     for cls in classes:
@@ -1359,30 +1351,18 @@ def register() -> None:
         get=get_node_process_height,
         options={"READ_ONLY"},
     )
-    # Register the global properties for Right-Angled Node Connection
-    bpy.types.WindowManager.rightangled_props = bpy.props.PointerProperty(
-        type=RightAngledGlobalProperties
-    )
 
 
 def unregister() -> None:
     # Stop the refresh process if it is still running
     global is_refreshed
-    is_refreshed = True  # Set "refreshed" flag
-
-    window_manager = bpy.context.window_manager
-    props = getattr(window_manager, "rightangled_props", None)
-
-    if props is not None and getattr(props, "is_refreshing", None) is not None:
-        props.is_refreshing = False  # Stop the refresh process
+    global is_refreshing
+    is_refreshed = True
+    is_refreshing = False
 
     # Unregister the timer if it is registered
     if bpy.app.timers.is_registered(force_redraw_node_editor_timer):
         bpy.app.timers.unregister(force_redraw_node_editor_timer)
-
-    # Delete the global properties for Right-Angled Node Connection
-    if hasattr(bpy.types.WindowManager, "rightangled_props"):
-        del bpy.types.WindowManager.rightangled_props
 
     # Delete the custom node properties when unregistering
     if hasattr(bpy.types.Node, "process_width"):
