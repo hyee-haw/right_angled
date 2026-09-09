@@ -346,41 +346,41 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
 
     @staticmethod
     def set_node_position_socket_origin(
-        this_node: bpy.types.Node,
-        this_socket: bpy.types.NodeSocket,
-        that_node: bpy.types.Node,
-        that_socket: bpy.types.NodeSocket,
+        move_node: bpy.types.Node,
+        move_socket: bpy.types.NodeSocket,
+        origin_node: bpy.types.Node,
+        origin_socket: bpy.types.NodeSocket,
         offset_y: float = 0.0,
     ) -> float:
         """
         Adjusts the position of a node based on the socket locations.
         """
-        if this_node.bl_idname == "NodeReroute":
-            this_location = this_node.location_absolute
+        if move_node.bl_idname == "NodeReroute":
+            move_location = move_node.location_absolute
         else:
-            this_location = get_socket_location(this_socket)
+            move_location = get_socket_location(move_socket)
 
-        if that_node.bl_idname == "NodeReroute":
-            that_location = that_node.location_absolute
+        if origin_node.bl_idname == "NodeReroute":
+            origin_location = origin_node.location_absolute
         else:
-            that_location = get_socket_location(that_socket)
-            that_location += mathutils.Vector((0.0, offset_y))
+            origin_location = get_socket_location(origin_socket)
+            origin_location += mathutils.Vector((0.0, offset_y))
             # get_socket_location() value is not refreshed before
             # display update.
 
-        location_diff = that_location - this_location
+        location_diff = origin_location - move_location
 
         if (  # If both nodes are Reroute nodes, adjustable vertically
             abs(location_diff.x) < abs(location_diff.y)
-            and this_node.bl_idname == "NodeReroute"
-            and that_node.bl_idname == "NodeReroute"
+            and move_node.bl_idname == "NodeReroute"
+            and origin_node.bl_idname == "NodeReroute"
         ):
-            this_node.location_absolute.x += location_diff.x
+            move_node.location_absolute.x += location_diff.x
 
             return 0.0
 
         else:  # adjust horizontally
-            this_node.location_absolute.y += location_diff.y
+            move_node.location_absolute.y += location_diff.y
 
             return location_diff.y
 
@@ -388,14 +388,17 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
         self,
         context: bpy.types.Context,
         this_node: bpy.types.Node,
-        from_link: bpy.types.NodeLink | None = None,
         offset_y: float = 0.0,
     ) -> None:
         """
         Recursively adjust the position of connected nodes to create
         right-angled connections.
         """
+        this_node.select = False
         list_sockets = list(this_node.inputs) + list(this_node.outputs)
+
+        list_connected = []
+
         for this_socket in list_sockets:
             if not this_socket.is_linked:
                 continue
@@ -404,9 +407,6 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
                 continue
 
             for link in this_socket.links:
-                if link == from_link:
-                    continue
-
                 if link.to_socket != this_socket:
                     that_socket = link.to_socket
                     that_node = link.to_node
@@ -424,6 +424,7 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
                 # the position of that node
                 next_offset_y = 0.0
                 if not this_socket.is_multi_input:
+                    # Move that_node relative to this_socket
                     next_offset_y = self.set_node_position_socket_origin(
                         that_node,
                         that_socket,
@@ -431,15 +432,17 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
                         this_socket,
                         offset_y=offset_y,
                     )
-                # Deselect the node to avoid infinite recursion
-                this_node.select = False
+                    list_connected.append((that_node, next_offset_y))
 
-                self.rightangle_connection(
-                    context,
-                    that_node,
-                    from_link=link,
-                    offset_y=next_offset_y,
-                )
+                    # Deselect the node to avoid infinite recursion
+                    that_node.select = False
+
+        for that_node, next_offset_y in list_connected:
+            self.rightangle_connection(
+                context,
+                that_node,
+                offset_y=next_offset_y,
+            )
 
 
 # noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
