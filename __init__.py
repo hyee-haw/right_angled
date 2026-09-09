@@ -350,8 +350,8 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
         move_socket: bpy.types.NodeSocket,
         origin_node: bpy.types.Node,
         origin_socket: bpy.types.NodeSocket,
-        offset_y: float = 0.0,
-    ) -> float:
+        origin_offset: mathutils.Vector = mathutils.Vector((0.0, 0.0)),
+    ) -> mathutils.Vector:
         """
         Adjusts the position of a node based on the socket locations.
         """
@@ -364,31 +364,36 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
             origin_location = origin_node.location_absolute
         else:
             origin_location = get_socket_location(origin_socket)
-            origin_location += mathutils.Vector((0.0, offset_y))
+            origin_location += origin_offset
             # get_socket_location() value is not refreshed before
             # display update.
 
         location_diff = origin_location - move_location
 
+        if origin_node.bl_idname == "NodeReroute":
+            compare_diff = location_diff - origin_offset
+        else:
+            compare_diff = location_diff
+
         if (  # If both nodes are Reroute nodes, adjustable vertically
-            abs(location_diff.x) < abs(location_diff.y)
+            abs(compare_diff.x) < abs(compare_diff.y)
             and move_node.bl_idname == "NodeReroute"
             and origin_node.bl_idname == "NodeReroute"
         ):
             move_node.location_absolute.x += location_diff.x
 
-            return 0.0
+            return mathutils.Vector((location_diff.x, 0.0))
 
         else:  # adjust horizontally
             move_node.location_absolute.y += location_diff.y
 
-            return location_diff.y
+            return mathutils.Vector((0.0, location_diff.y))
 
     def rightangle_connection(
         self,
         context: bpy.types.Context,
         this_node: bpy.types.Node,
-        offset_y: float = 0.0,
+        origin_offset: mathutils.Vector = mathutils.Vector((0.0, 0.0)),
     ) -> None:
         """
         Recursively adjust the position of connected nodes to create
@@ -420,28 +425,30 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
                 if that_node.select is False:
                     continue
 
+                that_offset = mathutils.Vector((0.0, 0.0))
+
                 # If this socket is a multi-input socket, skip adjusting
                 # the position of that node
-                next_offset_y = 0.0
                 if not this_socket.is_multi_input:
                     # Move that_node relative to this_socket
-                    next_offset_y = self.set_node_position_socket_origin(
+                    that_offset = self.set_node_position_socket_origin(
                         that_node,
                         that_socket,
                         this_node,
                         this_socket,
-                        offset_y=offset_y,
+                        origin_offset=origin_offset,
                     )
-                    list_connected.append((that_node, next_offset_y))
 
-                    # Deselect the node to avoid infinite recursion
-                    that_node.select = False
+                list_connected.append((that_node, that_offset))
 
-        for that_node, next_offset_y in list_connected:
+                # Deselect the node to avoid infinite recursion
+                that_node.select = False
+
+        for that_node, that_offset in list_connected:
             self.rightangle_connection(
                 context,
                 that_node,
-                offset_y=next_offset_y,
+                origin_offset=that_offset,
             )
 
 
