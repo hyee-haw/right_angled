@@ -399,11 +399,27 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
         Recursively adjust the position of connected nodes to create
         right-angled connections.
         """
+
+        # Deselect this node to avoid infinite recursion
+        if this_node.select is False:
+            return
+
         this_node.select = False
-        list_sockets = list(this_node.inputs) + list(this_node.outputs)
 
+        # Determine if this node is aligned vertically
+        if (
+            this_node.bl_idname == "NodeReroute"
+            and round(origin_offset.y, NDIGITS) == 0.0
+        ):
+            is_aligned_vertical = False
+        else:
+            is_aligned_vertical = True
+
+        list_sockets = list(this_node.outputs) + list(this_node.inputs)
         list_connected = []
+        list_reroute = []
 
+        # Separate connected nodes into regular and reroute nodes
         for this_socket in list_sockets:
             if not this_socket.is_linked:
                 continue
@@ -422,34 +438,63 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
                 if that_node is None or that_socket is None:
                     continue
 
-                if that_node.select is False:
-                    continue
+                connected = (this_socket, that_node, that_socket)
+                if that_node.bl_idname == "NodeReroute":
+                    list_reroute.append(connected)
+                else:
+                    list_connected.append(connected)
 
-                that_offset = mathutils.Vector((0.0, 0.0))
+        # Giving priority to reroute nodes, regular nodes later.
+        list_connected = list_reroute + list_connected
 
-                # If this socket is a multi-input socket, skip adjusting
-                # the position of that node
-                if not this_socket.is_multi_input:
-                    # Move that_node relative to this_socket
-                    that_offset = self.set_node_position_socket_origin(
-                        that_node,
-                        that_socket,
-                        this_node,
-                        this_socket,
-                        origin_offset=origin_offset,
-                    )
+        # Iterate over all connected nodes
+        for this_socket, that_node, that_socket in list_connected:
+            if that_socket.is_multi_input:
+                is_aligned_vertical = True
 
-                list_connected.append((that_node, that_offset))
+            # If not is_aligned, this_node should be "NodeReroute".
+            # So, adjust the self position of this_node if that_node
+            # is not "NodeReroute".
+            if (
+                not is_aligned_vertical
+                and that_node.bl_idname != "NodeReroute"
+            ):
+                self.set_node_position_socket_origin(
+                    this_node,
+                    this_socket,
+                    that_node,
+                    that_socket,
+                    origin_offset=mathutils.Vector((0.0, 0.0)),
+                )
+                is_aligned_vertical = True
 
-                # Deselect the node to avoid infinite recursion
-                that_node.select = False
+            if not that_node.select:
+                continue
 
-        for that_node, that_offset in list_connected:
+            that_offset = mathutils.Vector((0.0, 0.0))
+
+            # If this socket is a multi-input socket, skip adjusting
+            # the position of that node
+            if (
+                not this_socket.is_multi_input
+                and not that_socket.is_multi_input
+            ):
+                # Move that_node relative to this_socket
+                that_offset = self.set_node_position_socket_origin(
+                    that_node,
+                    that_socket,
+                    this_node,
+                    this_socket,
+                    origin_offset=origin_offset,
+                )
+
+            # Apply the right-angle connection recursively
             self.rightangle_connection(
                 context,
                 that_node,
                 origin_offset=that_offset,
             )
+        return
 
 
 # noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
