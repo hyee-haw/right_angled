@@ -288,7 +288,7 @@ class BaseOperator(bpy.types.Operator):
     """Base Operator for Right-Angled Node Connection."""
 
     bl_idname = "node.rightangled_base_operator"
-    bl_label = "Right-Angled Node Connection"
+    bl_label = "Base Operator"
     bl_options = {"REGISTER", "UNDO"}  # noqa: RUF012
 
     @classmethod
@@ -313,36 +313,12 @@ class BaseOperator(bpy.types.Operator):
 
 
 # noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
-# Recursively adjust the position of connected nodes to create
-# right-angled connections
-class NODE_OT_rightangled_right_angle_connection(BaseOperator):
-    """
-    Recursively adjust the position of connected nodes to create
-    right-angled connections.
-    """
+# Operator for changing the position of connected nodes
+class ChangeNodePositionOperator(BaseOperator):
+    """Base operator for changing the position of connected nodes"""
 
-    bl_idname = "node.rightangled_right_angle_connection"
-    bl_label = "Right-Angle Connection"
-
-    def execute(
-        self, context: bpy.types.Context
-    ) -> set["rna_enums.OperatorReturnItems"]:
-
-        active_node = getattr(context, "active_node", None)
-        selected_nodes = getattr(context, "selected_nodes", [])
-
-        list_selected_nodes = list(selected_nodes).copy()
-
-        if active_node is None or active_node not in selected_nodes:
-            return {"CANCELLED"}
-
-        self.rightangle_connection(context, active_node)
-
-        # rightangle_connection may deselect nodes, so we reselect them
-        for node in list_selected_nodes:
-            node.select = True
-
-        return {"FINISHED"}
+    bl_idname = "node.rightangled_position_operator"
+    bl_label = "Change Node Position"
 
     @staticmethod
     def set_node_position_socket_origin(
@@ -389,6 +365,80 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
 
             return mathutils.Vector((0.0, location_diff.y))
 
+    @staticmethod
+    def listup_connected_nodes(
+        list_sockets: list[bpy.types.NodeSocket],
+    ) -> list[
+        tuple[bpy.types.NodeSocket, bpy.types.Node, bpy.types.NodeSocket]
+    ]:
+        """
+        List up all connected nodes for the given sockets.
+
+        Returns a list of tuples containing:
+        (this_socket, that_node, that_socket)
+        """
+        list_connected = []
+
+        for this_socket in list_sockets:
+            if not this_socket.is_linked:
+                continue
+
+            if this_socket.links is None:
+                continue
+
+            for link in this_socket.links:
+                if link.to_socket != this_socket:
+                    that_socket = link.to_socket
+                    that_node = link.to_node
+                else:
+                    that_socket = link.from_socket
+                    that_node = link.from_node
+
+                if that_node is None or that_socket is None:
+                    continue
+
+                list_connected.append((this_socket, that_node, that_socket))
+
+        return list_connected
+
+
+# noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
+# Recursively adjust the position of connected nodes to create
+# right-angled connections
+class NODE_OT_rightangled_right_angle_connection(ChangeNodePositionOperator):
+    """
+    Recursively adjust the position of connected nodes to create
+    right-angled connections.
+    """
+
+    bl_idname = "node.rightangled_right_angle_connection"
+    bl_label = "Right-Angle Connection"
+
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
+
+        active_node = getattr(context, "active_node", None)
+        selected_nodes = getattr(context, "selected_nodes", [])
+
+        list_selected_nodes = list(selected_nodes).copy()
+
+        if active_node is None or active_node not in selected_nodes:
+            return {"CANCELLED"}
+
+        self.rightangle_connection(context, active_node)
+
+        # Horizontalize selected reroute nodes after adjusting
+        selected_nodes = getattr(context, "selected_nodes", [])
+        if selected_nodes is not None and len(selected_nodes) > 0:
+            bpy.ops.node.rightangled_horizontalize_reroutes()
+
+        # rightangle_connection may deselect nodes, so we reselect them
+        for node in list_selected_nodes:
+            node.select = True
+
+        return {"FINISHED"}
+
     def rightangle_connection(
         self,
         context: bpy.types.Context,
@@ -416,36 +466,22 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
             is_aligned_vertical = True
 
         list_sockets = list(this_node.outputs) + list(this_node.inputs)
-        list_connected = []
+        list_normal = []
         list_reroute = []
 
+        list_connected = self.listup_connected_nodes(list_sockets)
+
         # Separate connected nodes into regular and reroute nodes
-        for this_socket in list_sockets:
-            if not this_socket.is_linked:
-                continue
+        for this_socket, that_node, that_socket in list_connected:
+            connected = (this_socket, that_node, that_socket)
 
-            if this_socket.links is None:
-                continue
-
-            for link in this_socket.links:
-                if link.to_socket != this_socket:
-                    that_socket = link.to_socket
-                    that_node = link.to_node
-                else:
-                    that_socket = link.from_socket
-                    that_node = link.from_node
-
-                if that_node is None or that_socket is None:
-                    continue
-
-                connected = (this_socket, that_node, that_socket)
-                if that_node.bl_idname == "NodeReroute":
-                    list_reroute.append(connected)
-                else:
-                    list_connected.append(connected)
+            if that_node.bl_idname == "NodeReroute":
+                list_reroute.append(connected)
+            else:
+                list_normal.append(connected)
 
         # Giving priority to reroute nodes, regular nodes later.
-        list_connected = list_reroute + list_connected
+        list_connected = list_reroute + list_normal
 
         # Iterate over all connected nodes
         for this_socket, that_node, that_socket in list_connected:
@@ -495,6 +531,70 @@ class NODE_OT_rightangled_right_angle_connection(BaseOperator):
                 origin_offset=that_offset,
             )
         return
+
+
+# noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
+# Operator to horizontalize selected reroute nodes in the node editor.
+class NODE_OT_rightangled_horizontalize_reroutes(ChangeNodePositionOperator):
+    """
+    Operator to horizontalize reroute nodes in the node editor.
+    """
+
+    bl_idname = "node.rightangled_horizontalize_reroutes"
+    bl_label = "Horizontalize Reroutes"
+
+    @classmethod
+    def poll(cls, context: bpy.types.Context) -> bool:
+        """Poll method to check if the operator can be executed."""
+        return len(getattr(context, "selected_nodes", [])) > 0
+
+    def execute(
+        self, context: bpy.types.Context
+    ) -> set["rna_enums.OperatorReturnItems"]:
+
+        self.horizontalize_reroutes(context)
+
+        return {"FINISHED"}
+
+    def horizontalize_reroutes(
+        self,
+        context: bpy.types.Context,
+    ) -> None:
+
+        selected_nodes = getattr(context, "selected_nodes", [])
+        if selected_nodes is None or len(selected_nodes) == 0:
+            return
+
+        for this_node in selected_nodes:
+            if this_node.bl_idname == "NodeReroute":
+                continue
+
+            list_sockets = list(this_node.outputs) + list(this_node.inputs)
+            list_reroute = []
+
+            list_connected = self.listup_connected_nodes(list_sockets)
+
+            # Select reroute nodes only from the connected nodes
+            for this_socket, that_node, that_socket in list_connected:
+                connected = (this_socket, that_node, that_socket)
+
+                if that_node.bl_idname == "NodeReroute":
+                    list_reroute.append(connected)
+
+            # Iterate over all connected reroute nodes
+            for this_socket, that_node, that_socket in list_reroute:
+                # If this socket is a multi-input socket, skip adjusting
+                # the position of that node
+                if this_socket.is_multi_input:
+                    continue
+
+                # Move that_node (Reroute node) relative to this_socket
+                self.set_node_position_socket_origin(
+                    that_node,
+                    that_socket,
+                    this_node,
+                    this_socket,
+                )
 
 
 # noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
@@ -1169,6 +1269,14 @@ class NODE_PT_rightangled_sidebar(bpy.types.Panel):
                 text="Right-Angle Connection",
                 icon_value=custom_icons["rightangled"].icon_id,
             )
+
+        if custom_icons.get("horizontalize") is not None:
+            layout.operator(
+                "node.rightangled_horizontalize_reroutes",
+                text="Horizontalize Reroutes",
+                icon_value=custom_icons["horizontalize"].icon_id,
+            )
+
         layout.separator()
 
         if custom_icons.get("node_width") is not None:
@@ -1262,26 +1370,6 @@ class NODE_PT_rightangled_sidebar(bpy.types.Panel):
 
 
 # noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
-# Global Variables for Addon Paths and Icon Files
-
-dir_addon = os.path.dirname(__file__)
-dir_icons = os.path.join(dir_addon, "icons")
-
-list_icon_files = [
-    "rightangled",
-    "node_width",
-    "align_left",
-    "align_center",
-    "align_right",
-    "align_top",
-    "align_bottom",
-    "space_horizontal",
-    "space_vertical",
-    "information",
-]
-
-
-# noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
 # Handlers for the process_width and process_height properties of a node
 
 
@@ -1336,11 +1424,33 @@ def force_redraw_node_editor_timer() -> float | None:
 
 
 # noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
+# Global Variables for Addon Paths and Icon Files
+
+dir_addon = os.path.dirname(__file__)
+dir_icons = os.path.join(dir_addon, "icons")
+
+list_icon_files = [
+    "rightangled",
+    "horizontalize",
+    "node_width",
+    "align_top",
+    "align_left",
+    "align_center",
+    "align_right",
+    "align_bottom",
+    "space_horizontal",
+    "space_vertical",
+    "information",
+]
+
+
+# noqa: E501 ------2---------3---------4---------5---------6---------7-]------]8
 # Register and Unregister Functions
 
 classes = (
     RightAngledPreferences,
     NODE_OT_rightangled_right_angle_connection,
+    NODE_OT_rightangled_horizontalize_reroutes,
     NODE_OT_rightangled_set_node_width,
     NODE_OT_rightangled_align_left,
     NODE_OT_rightangled_align_center,
