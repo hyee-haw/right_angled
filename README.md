@@ -32,6 +32,13 @@ the result may instead become a vertical line.
 
 ![Right-Angle Connection](images/Right-Angle_Connection_1920x1080.png)
 
+### Horizontalize Reroutes
+
+Added in 1.0.6.
+Straightens Reroute nodes connected to regular nodes so they align horizontally.
+
+![Horizontalize_Reroutes](images/Horizontalize_Reroutes_1920x1080.png)
+
 ### Set Uniform Node Width
 
 Sets the width of all selected nodes to the same value.
@@ -79,6 +86,16 @@ For this reason, the add-on uses a nonstandard, tricky approach to obtain it.
 The values obtained this way appear to be rounded at some stage.
 As a result, connection lines do not always align perfectly horizontally,
 and moving nodes may introduce additional misalignment.
+
+![Change_Resolution_Scale](images/Change_Resolution_Scale_1920x1080.png)
+
+Blender's internal layout calculations depend on the display DPI and the following interface settings:
+
+- Display DPI
+- Preferences > Interface > Display > Resolution Scale
+- Preferences > Interface > Display > Line Width
+
+Changing these values affects the height of regular nodes and the position of each socket. As a result, Reroute nodes placed directly next to sockets may shift out of alignment.
 
 ## Reference
 
